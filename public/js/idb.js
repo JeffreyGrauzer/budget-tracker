@@ -1,10 +1,10 @@
 let db;
-const request = indexedDB.open('budget-tracker', 1);
+const request = indexedDB.open('budget_tracker', 1);
 request.onupgradeneede = function(event) {
     // save a reference to the database
     const db = event.target.result;
     // create an object store(table) called 'new_budget', set it to have an auto incrementing primary key of sorts
-    db.createObjectStore('new_pizza', { autoIncrement: true });
+    db.createObjectStore('new_budget', { autoIncrement: true });
 
     // upon a successful
     request.onsuccess = function(event) {
@@ -32,10 +32,46 @@ request.onupgradeneede = function(event) {
         budgetObjectStore.add(record);
         
     }
-   function checkDatabase() {
-       const transaction = db.transaction(['pending_budget'], 'readwrite');
-       const budgetObjectStore = transaction.ObjectStore('pending_budget');
-       budgetObjectStore.getAll().then
+   function uploadBudget() {
+          // open a transaction on your db
+       const transaction = db.transaction(['new_budget'], 'readwrite');
+       // access your object store
+       const budgetObjectStore = transaction.ObjectStore('new_budget');
+       // get all records from store and set it to a variable
+       const getAll = budgetObjectStore.getAll();
+       // upon a successful .getAll() execution, run this function 
+       getAll.onsuccess = function() {
+           // if there was data in  indexedDb's store, let's send it to the api server
+           if (getAll.result.length > 0) {
+               fetch('/api/transaction', {
+                   method: 'POST',
+                   body: JSON.stringify(getAll.result),
+                   headers: {
+                       Accept: 'application/json, text/plain, */*',
+                       'Content-Type': 'application/json'
+                   }
+               })
+                 .then(response => response.json())
+                 .then(serverResponse => {
+                     if (serverResponse.message) {
+                         throw new Error(serverResponse);
+                     }
+                     // open one more transaction
+                     const transaction = db.transaction(['new_budget'], 'readwrite');
+                     // access the new_budget object store
+                     const budgetObjectStore = transaction.objectStore('new_pizza');
+                     // clear all items in your store
+                     budgetObjectStore.clear();
+
+                     alert('All saved transactions have been submitted!');
+                 })
+                 .catch(err => {
+                     console.log(err);
+                 });
+           }
+       };
        
     }
 }
+
+window.addEventListener('online', uploadBudget);
